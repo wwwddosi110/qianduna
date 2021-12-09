@@ -1,0 +1,851 @@
+<template>
+    <div>
+      <div class="topBox bg-white padding-lr-lg padding-tb-xs">
+        <!-- 顶部 input + select -->
+        <div class="flex text-16 padding-tb-sm">
+          <div class="flex flex-sub align-center" v-show="mxzt == '首次创建'">
+            <p>模型名称：</p>
+            <el-input v-model="mxmc" :readonly="isEdit" placeholder="请输入模型名称"></el-input>
+          </div>
+          <div class="flex flex-sub align-center" v-show="mxzt == '首次创建'">
+            <p class="margin-left">模型版本：</p>
+            <el-input v-model="mxbb" :readonly="isEdit" placeholder="请输入模型版本例:V1、V2"></el-input>
+          </div>
+          <div class="flex flex-sub align-center">
+            <p :class="(mxzt != '首次创建' ? '' : 'margin-left')">模型状态：</p>
+            <el-select v-model="mxzt" :disabled="isEdit" placeholder="请选择模型状态">
+              <el-option
+                v-for="item in mxztArr"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value">
+              </el-option>
+            </el-select>
+          </div>
+        </div>
+        <div class="flex text-16 padding-tb-sm">
+          <div class="flex flex-sub align-center">
+            <p>业务类型：</p>
+            <el-select v-model="ywlx" :disabled="isEdit" placeholder="请选择供地状态">
+              <el-option
+                v-for="item in ywlxArr"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value">
+              </el-option>
+            </el-select>
+          </div>
+          <div class="flex flex-sub align-center">
+            <p class="margin-left-sm">所属自然资源要素：</p>
+            <el-select v-model="zyys" :disabled="isEdit" allow-create filterable placeholder="请选择所属自然资源要素">
+              <el-option
+                v-for="item in zyysArr"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value">
+              </el-option>
+            </el-select>
+          </div>
+        </div>
+        <div class="flex text-16 padding-tb-sm">
+          <div class="flex flex-sub align-center margin-right">
+            <p>模型描述：</p>
+            <el-input v-model="mxms" :readonly="isEdit" placeholder="请输入电子监管号" maxlength="10" show-word-limit></el-input>
+          </div>
+          <el-button type="primary" v-if="isEdit" @click="handleEdit">编辑</el-button>
+        </div>
+      </div>
+      <!-- 顶部 .end   ////////////////////////////////////////////////////////// -->
+
+      <div class="flex padding-top-sm">
+        <!--左侧     图谱画布 -->
+        <div class="visBox bg-white p-relative flex-sub solid">
+          <div class="p-absolute bg-white" v-if="isEdit" style="width: 100%; height: 40px; top: 1px; left: 0; z-index: 99;"></div>
+          <el-button type="primary" size="mini" @click="saveData">保存</el-button>
+          <el-button v-show="isSelectedEdge" @click="handleEditEdge" type="text" size="mini">编辑关系</el-button>
+          <div id="mynetwork" style="width: 100%; height: 656px;"></div>
+        </div>
+        <!-- 图谱画布.end   ////////////////////////////////////////////////// -->
+        <!-- 实体/关系 -->
+        <div class="rightBox bg-white padding-sm margin-left-sm">
+          <el-scrollbar
+            style="height: 100%;">
+            <!-- 实体 -->
+            <template v-if="!isSelectedEdge && selectedStatus == 'st'">
+              <p class="titBox text-18">实体</p>
+              <div class="padding-top-sm"></div>
+              <!-- 标签 -->
+              <div class="flex align-center padding-tb-xs">
+                <p class="text-16"><i class="text-red">*</i> 名称：</p>
+                <el-input :value="newNode[curNodeInd].label" :readonly="true" style="width: 260px;"></el-input>
+              </div>
+              <div class="flex align-center padding-tb-xs" v-for="(item, index) in newNode[curNodeInd].bqArr" :key="index">
+                <p class="text-16"><i class="text-red">*</i> 标签：</p>
+                <el-input :value="item.bq" :readonly="true" style="width: 260px;"></el-input>
+              </div>
+              <div class="padding-top-sm"></div>
+              <!-- 实体  属性映射 -->
+              <p class="titBox text-18">属性映射</p>
+              <div class="padding-top-sm"></div>
+              <div class="sxysBox flex padding-tb-xs flex-wrap"  v-for="(item, index) in newNode[curNodeInd].sx" :key="index+'-b'">
+                <div><el-input :value="item.bsm" :readonly="true"></el-input></div>
+                <div class="margin-lr-xs"><el-input :value="item.type" :readonly="true"></el-input></div>
+                <div><el-input :value="item.text" :readonly="true"></el-input></div>
+              </div>
+            </template>
+            <!-- 实体.end    ////////////////////////////////////////////////////////////-->
+
+
+            <!-- 关系 -->
+            <template  v-else-if="isSelectedEdge && selectedStatus == 'gx'">
+              <p class="titBox text-18">关系</p>
+              <div class="padding-top-sm"></div>
+              <div class="flex align-center padding-tb-xs">
+                <p class="text-16"><i class="text-red">*</i> 方向：</p>
+                <el-input :value="newEdge[curEdge].fx" :readonly="true" style="width: 260px;"></el-input>
+              </div>
+              <div class="flex align-center padding-tb-xs">
+                <p class="text-16"><i class="text-red">*</i> 类型：</p>
+                <el-input :value="newEdge[curEdge].lx" :readonly="true" style="width: 260px;"></el-input>
+              </div>
+
+              <div class="padding-top-sm"></div>
+              <!-- 关系   属性映射 -->
+
+              <p class="titBox text-18">属性映射</p>
+              <div class="padding-top-sm"></div>
+              <div class="sxysBox flex padding-tb-xs flex-wrap" v-for="(item, index) in newEdge[curEdge].sx" :key="index+'-c'">
+                <div><el-input :value="item.bsm" :readonly="true"></el-input></div>
+                <div class="margin-lr-xs"><el-input :value="item.type" :readonly="true"></el-input></div>
+                <div><el-input :value="item.text"></el-input></div>
+             </div>
+            </template>
+            <!-- 关系.end     ///////////////////////////////////////////////////////////////// -->
+
+            <template v-else>
+              <el-empty description="暂无选中数据~"></el-empty>
+            </template>
+
+          </el-scrollbar>
+        </div>
+      </div>
+
+
+      <!-- 添加实体  弹窗 信息 -->
+      <el-dialog
+        :title="stTit"
+        :visible.sync="stDialog"
+        :show-close="false"
+        width="30%">
+        <div class="dialogBox" style="height: 400px;">
+          <el-scrollbar
+            style="height: 100%;">
+            <!-- 实体 -->
+              <div class="flex align-center padding-tb-xs">
+                <p class="text-16"><i class="text-red">*</i> 名称：</p>
+                <el-input v-model="stName" placeholder="请填写实体名称" style="width: 315px;"></el-input>
+              </div>
+              <!-- 标签 -->
+              <div class="flex align-center padding-tb-xs" v-for="(ite, index) in bqArr" :key="index+'-a'">
+                <p class="text-16"><i class="text-red">*</i> 标签：</p>
+                <el-select v-model="ite.bq" allow-create filterable placeholder="请选择实体标签" style="margin-right: 20px;">
+                  <el-option
+                    v-for="item in bqselectArr"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value">
+                  </el-option>
+                </el-select>
+                <el-button v-if="index == 0" type="primary" plain @click="addLabel">+添加</el-button>
+                <el-button v-else type="text" size="small" style="width: 80px;" @click="delLabel(index)">删除</el-button>
+              </div>
+              <div class="padding-top-sm"></div>
+              <!-- 标签.end   ////////////////////////////////////////////////////////////////////// -->
+
+              <!-- 实体  属性映射 -->
+              <p class="titBox text-18">属性映射</p>
+              <div class="padding-top-sm"></div>
+              <div class="sxysBox flex padding-tb-xs flex-wrap" v-for="(ite, index) in stSxys" :key="index+'-b'">
+                <div class="flex align-center"><i class="text-red" style="margin-right: 5px;">* </i> <el-input v-model="ite.bsm" placeholder="请输入" :readonly="index < 2 ? true : false"></el-input></div>
+                <el-select v-model="ite.type" placeholder="请选择" :disabled="index == 2 ? true : false" style="margin: 0 20px;">
+                  <el-option
+                    v-for="item in sxysArr"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value">
+                  </el-option>
+                </el-select>
+                <div><el-input v-model="ite.text" placeholder="请填写"></el-input></div>
+                <el-button v-if="index > 2" type="text" size="small" style="margin-left: auto; margin-right: 10px;" @click="delStsxys(index)">删除</el-button>
+              </div>
+              <div class="tc padding-tb-xs"><el-button type="primary" plain @click="addStsxys">+添加</el-button></div>
+
+          </el-scrollbar>
+        </div>
+        <span slot="footer" class="dialog-footer">
+          <el-button id="cancelBtn" @click="stDialog = false">取 消</el-button>
+          <el-button type="primary" id="addStbtn">确 定</el-button>
+        </span>
+      </el-dialog>
+      <!-- 添加实体.end ////////////////////////////////////-->
+
+      <!-- 关系添加  弹窗 -->
+      <el-dialog
+        :title="gxTit"
+        :visible.sync="gxDialog"
+        :show-close="false"
+        width="30%">
+        <div class="dialogBox" style="height: 400px;">
+          <el-scrollbar
+            style="height: 100%;">
+             <div class="flex align-center padding-tb-xs">
+               <p class="text-16"><i class="text-red">*</i> 方向：</p>
+               <el-select v-model="fx" placeholder="请选择关系方向">
+                 <el-option
+                   v-for="item in fxArr"
+                   :key="item.value"
+                   :label="item.label"
+                   :value="item.value">
+                 </el-option>
+               </el-select>
+             </div>
+             <div class="flex align-center padding-tb-xs">
+               <p class="text-16"><i class="text-red">*</i> 类型：</p>
+               <el-select v-model="lx" placeholder="请选择关系类型">
+                 <el-option
+                   v-for="item in lxArr"
+                   :key="item.value"
+                   :label="item.label"
+                   :value="item.value">
+                 </el-option>
+               </el-select>
+             </div>
+
+             <div class="padding-top-sm"></div>
+             <!-- 关系   属性映射 -->
+
+             <p class="titBox text-18">属性映射</p>
+             <div class="padding-top-sm"></div>
+             <div class="sxysBox flex padding-tb-xs flex-wrap" v-for="(ite2, index) in gxSxys" :key="index+'-c'">
+               <div class="flex align-center"><i class="text-red" style="margin-right: 5px;">* </i> <el-input v-model="ite2.bsm" placeholder="请输入" :readonly="index < 1 ? true : false"></el-input></div>
+               <el-select v-model="ite2.type" placeholder="请选择" style="margin: 0 20px;">
+                 <el-option
+                   v-for="item in sxysArr"
+                   :key="item.value"
+                   :label="item.label"
+                   :value="item.value">
+                 </el-option>
+               </el-select>
+               <div><el-input v-model="ite2.text" placeholder="请填写" :title="index == 0 ? '当需要通过空间分析创建时填未知' : ''"></el-input></div>
+               <el-button v-if="index != 0" type="text" size="small" style="margin-left: auto; margin-right: 10px;" @click="delGxsxys(index)">删除</el-button>
+            </div>
+            <div class="tc padding-tb-xs"><el-button type="primary" plain @click="addGxsxys">+添加</el-button></div>
+          </el-scrollbar>
+        </div>
+        <span slot="footer" class="dialog-footer">
+          <el-button id="cancelEdge" @click="gxDialog = false">取 消</el-button>
+          <el-button type="primary" id="sureEdge">确 定</el-button>
+        </span>
+      </el-dialog>
+      <!-- 关系添加.end  -->
+    </div>
+</template>
+<script>
+  export default {
+    data() {
+      return {
+        curId: null, //编辑时当前模型id
+        isEdit: false, //是否可编辑
+        stTit: '添加实体',
+        stDialog: false,//添加实体 信息弹窗
+        gxTit: '添加关系',
+        gxDialog:false,//添加关系 信息弹窗
+        isSelectedEdge: false,//编辑关系 按钮显示隐藏  如果画布上点击了关系线条显示
+        //stOrgx: true,//画布右侧展示实体/关系 信息
+        mxmc: '',//模型名称
+        mxbb: '',//模型版本
+        mxzt: '首次创建',//模型状态
+        mxztArr: [//模型状态   选项
+          {value: '修改', label: '修改'},
+          {value: '首次创建', label: '首次创建'},
+          {value: '查看', label: '查看'},
+        ],
+        ywlx: '',//业务类型
+        ywlxArr: [//业务类型   选项
+          {value: '土地报批', label: '土地报批'},
+          {value: '用地预审', label: '用地预审'},
+          {value: '土地供应', label: '土地供应'},
+          {value: '地籍登记', label: '地籍登记'},
+        ],
+        zyys: '',//所属自然资源要素
+        zyysArr: [//所属自然资源要素   选项
+          {value: '土地', label: '土地'},
+          {value: '矿产', label: '矿产'},
+          {value: '森林', label: '森林'},
+          {value: '湿地', label: '湿地'},
+        ],
+        mxms: '',//模型描述
+        stName: '',//实体名称
+        bqArr: [{bq: ''}],//标签 (v-model不能直接绑定到v-for迭代别名所以需要加一层{bq: ''})
+        bqselectArr: [//标签   选项
+          {value: '业务', label: '业务'},
+          {value: '空间', label: '空间'},
+          {value: '时间', label: '时间'},
+          {value: '地类', label: '地类'},
+        ],
+        sxysArr: [//属性映射   中间string  下拉框选项
+          {value: 'int', label: 'int'},
+          {value: 'float', label: 'float'},
+          {value: 'string', label: 'string'},
+          {value: 'bool', label: 'bool'},
+          {value: 'list', label: 'list'},
+        ],
+        stSxys: [//属性映射（实体）   + 新增项
+          {bsm: 'name', type: '', text: ''},
+          {bsm: '唯一标识码', type: '', text: ''},
+          {bsm: '业务数据', type: 'string', text: ''}
+        ],
+        gxSxys: [//属性映射（关系）  +  新增项
+          {bsm: 'name', type: '', text: ''},
+        ],
+        fx: '',//方向
+        fxArr: [//方向   选项
+          {value: '无向', label: '无向'},
+          {value: '单向', label: '单向'},
+          {value: '双向', label: '双向'},
+        ],
+        lx: '',//类型
+        lxArr: [//类型   选项
+          {value: '业务', label: '业务'},
+          {value: '空间', label: '空间'},
+          {value: '时间', label: '时间'},
+          {value: '权属', label: '权属'},
+          {value: '属性', label: '属性'},
+        ],
+        newNode: [],//把新加的节点信息添加到一个数组中
+        newEdge: [],//节点关系数组
+        curEdgeid: '',// 当前画布点击的关系线的id
+        curEdge: '',//当前画布点击的关系线  在newEdge中的索引
+        curNodeInd: '',// 当前画布点击的实体在newNode中的索引
+        nodes: new vis.DataSet([]),
+        edges: new vis.DataSet([]),
+        selectedStatus: '',//用来判断右侧信息展示实体还是关系
+      }
+    },
+    created() {
+      var status = this.$route.query.status;
+      if(status == 'first') this.mxzt = '首次创建';
+      if(this.$route.query.id) this.curId = this.$route.query.id;
+      if(status == 'detail') {
+        this.mxzt = '查看';
+        this.isEdit = true;
+        this.loadData();
+      }
+    },
+    mounted() {
+      // vis画布
+      this.initVis();
+    },
+    methods: {
+      initVis() {
+        var _this = this;
+        // var nodes = new vis.DataSet([]);
+        // var edges = new vis.DataSet([]);
+        var container = document.getElementById('mynetwork');
+        var data = { nodes: _this.nodes, edges: _this.edges };
+        var locales = {
+            en: {
+              edit: '编辑',
+              del: '删除选中',
+              back: '后退',
+              addNode: '添加实体',
+              addEdge: '添加关系',
+              editNode: '编辑实体',
+              editEdge: '编辑关系',
+              addDescription: '单击一个空白区域以放置一个新实体。',
+              edgeDescription: '单击一个实体并拖拽到另一个实体以连接它们。',
+              editEdgeDescription: '单击控制点并将它们拖到实体以连接到它。',
+              createEdgeError: '无法将边连接到集群。',
+              deleteClusterError: '无法删除集群。',
+              editClusterError: '无法编辑群集',
+            }
+        };
+        var options = {
+          nodes: {
+            shape: 'dot', //节点形状
+            size: 12,
+            font: {
+              color: '#333', //
+            },
+            borderWidth: 0, //节点边框宽度
+            size: 13, //节点大小
+            chosen: {
+              node: function(e) {
+                e.color = '#409EFF';
+              }
+            }
+            // chosen: false
+          },
+          // 设置关系连线
+          edges: {
+            color: {
+              color: '#999', //线颜色
+            },
+            font: {
+              color: '#333', //线条上的文字颜色
+              strokeWidth: 0, //文字描边
+            },
+          },
+          locales: locales,//语言设置
+        	// configure: true,
+        	clickToUse: false,//是否点击激活
+        	manipulation:{//节点操作
+        		enabled: true ,
+        		initiallyActive: true,//直接编辑
+        		addNode: function(data, callback) {//添加实体
+              _this.stDialog = true;//打开弹窗
+              _this.stTit = '添加实体';
+              document.getElementById("addStbtn").onclick = function() {//弹窗点击确定
+
+                // 判断   添加实体
+                if(!_this.verifyFun('add')) return;
+
+                data.id = _this.newNode.length;  //设置节点id  为节点数组长度
+                data.label = _this.stName;  //节点lable为输入的实体名称
+
+                _this.newNode.push({id: data.id, label: data.label, bqArr: _this.bqArr, sx: _this.stSxys});//把节点信息放到 newNode
+                console.log('huabu', data);
+                callback(data);
+                console.log('添加的节点arr', _this.newNode);
+                _this.stDialog = false;//关闭弹窗
+
+                //创建成功后重置弹窗里面的内容及值
+                _this.stName = '';
+                _this.bqArr = [{bq: ''}];
+                _this.stSxys = [
+                  {bsm: 'name', type: '', text: ''},
+                  {bsm: '唯一标识码', type: '', text: ''},
+                  {bsm: '业务数据', type: 'string', text: ''}
+                ];
+
+              }
+
+
+              document.getElementById("cancelBtn").onclick = function() {
+                // 点击取消后重置弹框内容
+                _this.stName = '';
+                _this.bqArr = [{bq: ''}];
+                _this.stSxys = [
+                  {bsm: 'name', type: '', text: ''},
+                  {bsm: '唯一标识码', type: '', text: ''},
+                  {bsm: '业务数据', type: 'string', text: ''}
+                ];
+              }
+
+            },
+            editNode: function(data, callback) {
+              console.log('要编辑节点：',data);
+              console.log('当前画布中的节点arr', _this.newNode);
+              _this.stDialog = true;
+              _this.stTit = '编辑实体';
+              var editId = data.id; //获取到当前要编辑节点的id
+              var curIndex = _this.newNode.findIndex((item) => {return item.id == editId});//通过当前节点id获取到在 画布节点数组中索引
+              // 渲染  弹窗中的内容；
+              _this.stName = _this.newNode[curIndex].label;
+              _this.bqArr = _this.newNode[curIndex].bqArr;
+              _this.stSxys = _this.newNode[curIndex].sx;
+
+              document.getElementById("addStbtn").onclick = function() {//弹窗点击确定
+
+                if(!_this.verifyFun(editId)) return;
+
+                data.id = editId;  //节点id不变
+                data.label = _this.stName;  //节点lable为属性映射中name值
+                // 修改 画布节点数组中  当前项信息
+                _this.newNode[curIndex].label = data.label;
+                _this.newNode[curIndex].bqArr = _this.bqArr;
+                _this.newNode[curIndex].sx = _this.stSxys;
+
+                _this.stDialog = false;//关闭弹窗
+                callback(data);
+
+                //编辑成功后重置弹窗里面的内容及值
+                _this.stName = '';
+                _this.bqArr = [{bq: ''}];
+                _this.stSxys = [
+                  {bsm: 'name', type: '', text: ''},
+                  {bsm: '唯一标识码', type: '', text: ''},
+                  {bsm: '业务数据', type: 'string', text: ''}
+                ];
+              }
+              document.getElementById("cancelBtn").onclick = function() {
+                callback(data);
+              }
+            },
+        		addEdge: function (data, callback) {
+              if (data.from == data.to) {//如果添加的关系连接的都是自身
+                return _this.$message.error('关系需要建立在两个实体之间');
+              } else {
+                  console.log('当前编辑关系',data);
+                  _this.gxDialog = true;
+                  _this.gxTit = '添加关系';
+                  document.getElementById("sureEdge").onclick = function() {//确认编辑关系
+
+                    if(!_this.fx) {return _this.$message.error('请选择方向')}
+                    if(!_this.lx) {return _this.$message.error('请选择类型')}
+                    // 关系类型为空间时  所选的两个节点都需要有空间标签
+                    var fromInd = _this.newNode.findIndex((item) => {return item.id == data.from}), // 获取到from节点在node数组中的索引
+                        toId = _this.newNode.findIndex((item) => {return item.id == data.to}); // 获取到to节点在node数组中的索引
+                    if(_this.lx == '空间') {
+                      for(var i = 0; i < _this.newNode.length; i++) {
+                        if(JSON.stringify(_this.newNode[fromInd].bqArr).indexOf('空间') == -1 || JSON.stringify(_this.newNode[toId].bqArr).indexOf('空间') == -1){
+                          return _this.$message.error('关系为空间关系时，仅针对两个空间实体可以创建空间关系，否则无法创建')
+                        }
+                      }
+                    }
+
+                    let isGxEmpyt =  _this.gxSxys.every(obj => Object.keys(obj).every(i=>obj[i]));//判断关系属性值有没有空值    false有空值
+                    if(!isGxEmpyt) {//如果有
+                      return _this.$message.error('属性映射请填写完整')
+                    }
+
+                    for(var i = 0; i < _this.newEdge.length; i++) {
+                      if(_this.fx == _this.newEdge[i].fx && _this.lx == _this.newEdge[i].lx && JSON.stringify(_this.gxSxys) == JSON.stringify(_this.newEdge[i].sx)) {
+                        return _this.$message.error('已存在相同关系')
+                      }
+                    }
+
+                    // 根据方向选择  设置关系线箭头 arrows:"to, from"
+                    if(_this.fx == '无向') {data.arrows = '';}
+                    if(_this.fx == '单向') {data.arrows = 'to';}
+                    if(_this.fx == '双向') {data.arrows = 'to,from';}
+
+                    data.label = _this.lx; //设置关系线 上面展示的文字内容
+                    //data.ids = _this.newEdge.length;//多加一个id标记  （添加关系线时自带的有id不能修改 否则会增加两条线）
+
+                    console.log('huabugx', data);
+                    callback(data);
+                    _this.newEdge.push({id: data.id, form: data.from, to: data.to, fx: _this.fx, lx: _this.lx, sx: _this.gxSxys});//将关系线信息添加到数组中 存起来
+                    console.log('新增关系arr', _this.newEdge)
+                    //关闭弹窗并清空内容
+                    _this.gxDialog = false;
+                    _this.fx = '';
+                    _this.lx = '';
+                    _this.gxSxys = [{bsm: 'name', type: '', text: ''}];
+                  }
+                  //document.getElementById("cancelEdge").onclick = function() {}//点击取消后什么都不执行
+              }
+            },
+        		deleteNode: function(data, callback) {//删除节点时需要删除newNode中对应的节点 及newEdge中节点相连的关系
+              // if(_this.newNode.length == 0) return _this.$message.error('当前没有可删除的节点')   //不起作用
+              var curId = data.nodes[0];//当前要删除节点的id
+              var ind = _this.newNode.findIndex(item => {return item.id == curId});
+              _this.newNode.splice(ind, 1);
+
+              if(_this.newEdge.length > 0) {
+                _this.newEdge.forEach((item, index) => {
+                  if(item.from == curId || item.to == curId) {
+                    _this.newEdge.splice(index, 1);
+                  }
+                })
+              }
+              callback(data);
+              // if(_this.newNode.length == 0) {
+                _this.selectedStatus = '';//删除当前选中的实体后右侧暂无选中数据
+              // }
+            },
+        		deleteEdge: function(data, callback) {//删除关系时需要删除newEdge中对应的关系
+              console.log(data)
+              var id = data.edges[0];
+              var ind = _this.newEdge.findIndex(item => {return item.id == id});
+              _this.newEdge.splice(ind, 1);
+              callback(data);
+              _this.selectedStatus = '';//删除当前选中的关系后右侧暂无选中数据
+            },
+            editEdge: false,
+        	},
+          physics: {
+            enabled: true
+          }
+        }
+        var network = new vis.Network(container, data, options);
+
+
+        // 通过点击事件获取到当前要编辑的关系线的id
+        network.on("click", (e) => {
+          // console.log(e);
+
+          if(e.nodes.length == 0 && e.edges.length > 0) {//点击关系线时  返回的nodes数组为空  edges数组中为当前点击关系线的id（e.edges[0]）
+            _this.curEdgeid = e.edges[0];
+            _this.curEdge = _this.newEdge.findIndex(item => {return item.id == _this.curEdgeid})  //通过id获取到当前关系 在newEdge中的索引   用来渲染
+            console.log('索引gx',_this.curEdge)
+            _this.isSelectedEdge = true;  //当前点击的是关系线  就展示编辑关系按钮
+            _this.selectedStatus = 'gx';//用来判断右侧  信息是展示实体 还是关系
+          }else if(e.nodes.length > 0 && e.edges.length >= 0){//点击了实体
+            // _this.curNodeid = e.nodes[0];//获取当前点击的实体id
+            console.log(_this.newNode)
+            _this.curNodeInd = _this.newNode.findIndex(item => {return item.id == e.nodes[0]})  //通过id获取到当前关系 在newNode中的索引   用来渲染右侧实体信息
+            // console.log('索引',_this.curNodeInd)
+            _this.isSelectedEdge = false;
+            _this.selectedStatus = 'st';//与isSelectedEdge 一起 用来判断右侧  信息是展示实体 还是关系
+          }else {
+            _this.selectedStatus = ''; //当点击空白处时  右侧不能展示空白  所以让selectedStatus=st先
+            _this.isSelectedEdge = false;
+          }
+        });
+      },
+      // 编辑模型信息加载
+      loadData() {
+        const loading = this.$loading({
+          lock: true,
+          text: 'Loading',
+          spinner: 'el-icon-loading',
+          background: 'rgba(0, 0, 0, 0.7)'
+        });
+        this.$api.modelDetail({
+          id: this.curId
+        }).then(res => {
+          console.log('模型详情', res)
+          loading.close();
+          // this.mxmc = res.modelname;
+          // this.mxbb = res.modelversion;
+          this.ywlx = res.data.Businesstype;
+          this.zyys = res.data.Resourcemeta;
+          this.mxms = res.data.Modeldecribe;
+
+          // _this.newNode.push({id: data.id, label: data.label, bqArr: _this.bqArr, sx: _this.stSxys});//把节点信息放到 newNode
+          // _this.newEdge.push({id: data.id, form: data.from, to: data.to, fx: _this.fx, lx: _this.lx, sx: _this.gxSxys});
+          // id: 0,label: "12"
+          // arrows: "to,from",from: 0,id: "e9b10648-617e-41d8-b802-1fc597d7d3e3",label: "业务",to: 1
+          // res.data.entity_label.forEach(item => {
+          //   this.nodes.push({id: item.id, label: item.name})
+          // })
+          this.initVis()
+          // _this.newNode
+        })
+      },
+      // 保存图谱数据给后台
+      saveData() {
+        if(!this.mxmc) return this.$message.error('请填写模型名称');
+        if(!this.mxbb) return this.$message.error('请填写模型版本');
+        if(!this.ywlx) return this.$message.error('请选择业务类型');
+        if(!this.zyys) return this.$message.error('请选择所属自然资源要素');
+        if(!this.mxms) return this.$message.error('请填写模型描述');
+        if(this.newNode.length == 0) return this.$message.error('请至少添加一个实体');
+        console.log(JSON.stringify(this.newNode))
+        console.log(JSON.stringify(this.newEdge))
+        var entity_label = [],
+            entity_relation = [];
+        // 前端页面与后台接口同时进行   设计的数据结构不同    需要转换
+        var nodeArr = this.newNode.map(item => {
+          item.bqArr = item.bqArr.map(ite => {return ite.bq});
+          return item;
+        })
+        this.$api.saveModel({//    /model_manager/create/
+          Modelinfo: {
+            Modelname: this.mxmc,
+            Modelversion: this.mxbb,
+            Modelstatus: this.mxzt,
+            Businesstype: this.ywlx,
+            Resourcemeta: this.zyys,
+            Modeldecribe: this.mxms,
+          },
+          Modelcreate: {
+            entity_label: '',
+            entity_relation: '',
+          },
+        }).then(res => {
+          console.log('模型创建', res);
+        })
+
+      },
+      // 添加/编辑 实体时的判断
+      verifyFun(param) {
+        var _this = this;
+
+        if(!_this.stName) {
+          _this.$message.error('请输入实体名称');
+          return false;
+        }
+        // 实体名称不能重复
+        if(_this.newNode.length > 0) {
+          for(var i = 0; i < _this.newNode.length; i++) {
+            if(_this.stName == _this.newNode[i].label && param && param != _this.newNode[i].id) {
+              _this.$message.error('实体名称重复，请重新输入');
+              return false;
+            }
+          }
+        }
+
+
+        let isBqEmpty = _this.bqArr.every(obj => Object.keys(obj).every(i=>obj[i]));//判断实体标签有没有没选择的    false有
+        if(!isBqEmpty) {//如果有
+          _this.$message.error('请选择实体标签');
+          return false;
+        }
+
+        // 判断标签是否有重复
+        for (var i = 0; i < _this.bqArr.length - 1; i++) {
+          for (var j = i + 1; j < _this.bqArr.length; j++) {
+            if (_this.bqArr[i].bq === _this.bqArr[j].bq) {
+              _this.$message.error('标签重复');
+              return false;
+            }
+          }
+        }
+
+
+        let isSxEmpyt =  _this.stSxys.every(obj => Object.keys(obj).every(i=>obj[i]));//判断实体属性值有没有空值    false有空值
+        if(!isSxEmpyt) {//如果有
+          _this.$message.error('属性映射请填写完整');
+          return false;
+        }
+
+        // 判断属性映射bsm（第一个值）值是否有重复的
+        for (var i = 0; i < _this.stSxys.length - 1; i++) {
+          for (var j = i + 1; j < _this.stSxys.length; j++) {
+            if (_this.stSxys[i].bsm === _this.stSxys[j].bsm) {
+              _this.$message.error('属性名重复');
+              return false;
+            }
+          }
+        }
+
+        return true;
+
+      },
+      // 在画布上点击了编辑关系
+      handleEditEdge() {
+        var _this = this;
+        _this.gxDialog = true;
+        _this.gxTit = '编辑关系';
+
+        // 渲染关系弹框里面的值
+        _this.fx = _this.newEdge[_this.curEdge].fx;
+        _this.lx = _this.newEdge[_this.curEdge].lx;
+        _this.gxSxys = _this.newEdge[_this.curEdge].sx;
+
+        console.log(_this.newEdge)
+        document.getElementById("sureEdge").onclick = function() {
+          var fromId = _this.newEdge[_this.curEdge].from,
+              toId = _this.newEdge[_this.curEdge].from;
+          // 关系类型为空间时  所选的两个节点都需要有空间标签
+          var fromInd = _this.newNode.findIndex((item) => {return item.id == fromId}), // 获取到from节点在node数组中的索引
+              toId = _this.newNode.findIndex((item) => {return item.id == toId}); // 获取到to节点在node数组中的索引
+          if(_this.lx == '空间') {
+            for(var i = 0; i < _this.newNode.length; i++) {
+              if(JSON.stringify(_this.newNode[fromInd].bqArr).indexOf('空间') == -1 || JSON.stringify(_this.newNode[toId].bqArr).indexOf('空间') == -1){
+                return _this.$message.error('关系为空间关系时，仅针对两个空间实体可以创建空间关系，否则无法创建')
+              }
+            }
+          }
+
+          let isGxEmpyt =  _this.gxSxys.every(obj => Object.keys(obj).every(i=>obj[i]));//判断关系属性值有没有空值    false有空值
+          if(!isGxEmpyt) {//如果有
+            return _this.$message.error('属性映射请填写完整')
+          }
+
+
+          for(var i = 0; i < _this.newEdge.length; i++) {
+            if(_this.fx == _this.newEdge[i].fx && _this.lx == _this.newEdge[i].lx && JSON.stringify(_this.gxSxys) == JSON.stringify(_this.newEdge[i].sx) && i != _this.curEdge) {
+              return _this.$message.error('已存在相同关系')
+            }
+          }
+
+          // 更新关系数组里面数据
+          _this.newEdge[_this.curEdge].fx = _this.fx;
+          _this.newEdge[_this.curEdge].lx = _this.lx;
+          _this.newEdge[_this.curEdge].sx = _this.gxSxys;
+
+          let arrows = '';
+          if(_this.fx == '无向') {arrows = '';}
+          if(_this.fx == '单向') {arrows = 'to';}
+          if(_this.fx == '双向') {arrows = 'to,from';}
+
+          // 更新画布中的关系
+          _this.edges.update({id: _this.curEdgeid, label: _this.lx, arrows: arrows});
+
+          // 关闭弹窗并清空内容
+          _this.gxDialog = false;
+          _this.fx = '';
+          _this.lx = '';
+          _this.gxSxys = [{bsm: 'name', type: '', text: ''}];
+
+        }
+      },
+      // 查看详情  点击编辑
+      handleEdit() {
+        this.isEdit = false;
+        this.mxzt = '修改'
+      },
+      // 实体标签 添加
+      addLabel() {
+        this.bqArr.push({bq: ''})
+      },
+      // 实体标签 删除
+      delLabel(index) {
+        this.bqArr.splice(index, 1)
+      },
+      // 实体  属性映射 添加
+      addStsxys() {
+        this.stSxys.push({bsm: '', type: '', text: ''})
+      },
+      // 实体  属性映射 删除
+      delStsxys(index) {
+        this.stSxys.splice(index, 1)
+      },
+      // 关系  属性映射 添加
+      addGxsxys() {
+        this.gxSxys.push({bsm: '', type: '', text: ''})
+      },
+      // 关系  属性映射 删除
+      delGxsxys(index) {
+        this.gxSxys.splice(index, 1)
+      },
+    }
+  }
+</script>
+
+<style lang="scss" scoped>
+  .topBox {
+    border-radius: 4px;
+    p {white-space: nowrap;}
+    .el-select {width: 100%;}
+  }
+
+  .visBox {
+    position: relative;
+    /deep/ .el-button {position: absolute; z-index: 9; right: 10px; top: 5px;}
+    /deep/ .el-button--text {right: 80px;}
+  }
+
+  .rightBox,.dialogBox {
+    width: 432px;
+    height: 656px;
+    .titBox {
+      border-left: 4px solid #409EFF;
+      padding-left: 15px;
+      line-height: 20px;
+    }
+    .sxysBox {
+      /deep/ .el-input__inner {width: 115px;}
+    }
+  }
+
+  /deep/ .el-dialog {width: 452px!important;}
+</style>
+<style>
+  /* 用来隐藏横向滚动条  这个样式不能写在局部的style scoped里面 */
+  .rightBox .el-scrollbar__wrap, .dialogBox .el-scrollbar__wrap{
+    overflow-x: hidden;
+  }
+  .rightBox .is-horizontal, .dialogBox .is-horizontal {
+      display: none;
+  }
+
+  /* 画布  操作样式修改 */
+  div.vis-network div.vis-edit-mode button.vis-button, div.vis-network div.vis-manipulation button.vis-button {margin-left: 5px!important;}
+  div.vis-network div.vis-manipulation div.vis-separator-line {margin: 0 6px 0 6px!important;}
+  div.vis-network button.vis-close {display: none!important;}
+  div.vis-network div.vis-manipulation {padding-top: 6px!important; background: #EFF6FF!important; height: 32px!important;}
+</style>
